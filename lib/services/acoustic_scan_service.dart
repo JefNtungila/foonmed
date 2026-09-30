@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
 import '../models/scan_data.dart';
+import 'crack_detector.dart';
 
 class AcousticScanService {
   AcousticScanService({
@@ -16,6 +17,12 @@ class AcousticScanService {
     this.numChannels = 1,
     this.fundamentalFrequency = 5000.0,
   });
+
+  /// STFT frame length (power of two, required by the FFT).
+  static const int windowSize = 1024;
+
+  /// STFT hop size between frames.
+  static const int hopSize = 512;
 
   final AudioPlayer _audioPlayer = AudioPlayer();
   final AudioRecorder _audioRecorder = AudioRecorder();
@@ -414,6 +421,25 @@ class AcousticScanService {
     );
 
     // -------------------------------------------------------------------------
+    // CRACK DETECTION
+    // -------------------------------------------------------------------------
+
+    final DetectionResult detection = detect(
+      features: mathematicalRepresentation.spectrumMatrix,
+      sampleRate: sampleRate,
+      hopSize: hopSize,
+      fundamentalFrequency: fundamentalFrequency,
+    );
+
+    debugPrint(
+      'AcousticScanService: Crack detection: '
+      '${detection.verdict.name} '
+      '(score: ${detection.score.toStringAsFixed(2)}, '
+      'confidence: ${detection.confidence.toStringAsFixed(2)}, '
+      'segments: ${detection.segments.length})',
+    );
+
+    // -------------------------------------------------------------------------
     // CREATE METADATA
     // -------------------------------------------------------------------------
 
@@ -435,6 +461,7 @@ class AcousticScanService {
       metadata: metadata,
       mathematicalRepresentation:
       mathematicalRepresentation,
+      detection: detection,
       spatialTimeLog:
       List<SpatialTimeLogEntry>.unmodifiable(
         _spatialTimeLog,
@@ -587,9 +614,6 @@ class AcousticScanService {
     // STFT PARAMETERS
     // -------------------------------------------------------------------------
 
-    const int windowSize = 1024;
-    const int hopSize = 512;
-
     if (audioSamples.length <
         windowSize) {
       return MathematicalRepresentation(
@@ -642,7 +666,7 @@ class AcousticScanService {
 
       // Calculate frequency spectrum.
       final List<double> magnitudes =
-      _performDFT(frame);
+      _performFFT(frame);
 
       if (magnitudes.isEmpty) {
         continue;
@@ -692,42 +716,41 @@ class AcousticScanService {
               frequencyResolution;
 
       // -----------------------------------------------------------------------
-      // FUNDAMENTAL ENERGY
+      // BAND ENERGIES
       // -----------------------------------------------------------------------
 
       const double bandWidth =
       500.0;
 
-      final int fundamentalBinStart =
-      max(
-        0,
-        ((fundamentalFrequency -
-            bandWidth) /
-            frequencyResolution)
-            .floor(),
+      final double fundamentalEnergy =
+      _bandEnergy(
+        magnitudes,
+        fundamentalFrequency - bandWidth,
+        fundamentalFrequency + bandWidth,
+        frequencyResolution,
       );
 
-      final int fundamentalBinEnd =
-      min(
-        magnitudes.length - 1,
-        ((fundamentalFrequency +
-            bandWidth) /
-            frequencyResolution)
-            .ceil(),
+      final double secondHarmonicEnergy =
+      _bandEnergy(
+        magnitudes,
+        2 * fundamentalFrequency - bandWidth,
+        2 * fundamentalFrequency + bandWidth,
+        frequencyResolution,
       );
 
-      double fundamentalEnergy = 0.0;
-
-      for (
-      int k =
-          fundamentalBinStart;
-      k <= fundamentalBinEnd;
-      k++
-      ) {
-        fundamentalEnergy +=
-            magnitudes[k] *
-                magnitudes[k];
-      }
+      final double sidebandEnergy =
+      _bandEnergy(
+            magnitudes,
+            fundamentalFrequency - 3 * bandWidth,
+            fundamentalFrequency - 1.2 * bandWidth,
+            frequencyResolution,
+          ) +
+          _bandEnergy(
+            magnitudes,
+            fundamentalFrequency + 1.2 * bandWidth,
+            fundamentalFrequency + 3 * bandWidth,
+            frequencyResolution,
+          );
 
       // -----------------------------------------------------------------------
       // TOTAL ENERGY
@@ -742,27 +765,42 @@ class AcousticScanService {
       }
 
       // -----------------------------------------------------------------------
-      // HARMONIC ENERGY RATIO
+      // ENERGY RATIOS + SPECTRAL FLATNESS
       // -----------------------------------------------------------------------
 
+      double energyRatio(double energy) {
+        return totalEnergy > 0
+            ? (energy / totalEnergy).clamp(0.0, 1.0)
+            : 0.0;
+      }
+
       final double harmonicEnergyRatio =
-      totalEnergy > 0
-          ? (fundamentalEnergy /
-          totalEnergy)
-          .clamp(
-        0.0,
-        1.0,
-      )
-          : 0.0;
+      energyRatio(fundamentalEnergy);
+
+      final double sidebandRatio =
+      energyRatio(sidebandEnergy);
+
+      final double secondHarmonicRatio =
+      energyRatio(secondHarmonicEnergy);
+
+      final double spectralFlatness =
+      _spectralFlatness(magnitudes);
 
       // -----------------------------------------------------------------------
       // STORE FEATURES
+      //
+      // Row layout consumed by crack_detector.dart:
+      // [rms, peakHz, harmonicRatio, sidebandRatio,
+      //  secondHarmonicRatio, spectralFlatness]
       // -----------------------------------------------------------------------
 
       spectrumMatrix.add([
         rms,
         peakFrequencyHz,
         harmonicEnergyRatio,
+        sidebandRatio,
+        secondHarmonicRatio,
+        spectralFlatness,
       ]);
 
       energyProfile.add(rms);
@@ -818,65 +856,219 @@ class AcousticScanService {
   }
 
   // ---------------------------------------------------------------------------
-  // DFT
+  // FFT
+  //
+  // Radix-2 Cooley-Tukey. Replaces the previous O(N^2) DFT, which was too
+  // slow to process a full scan on the UI thread (dropped frames).
   // ---------------------------------------------------------------------------
 
-  List<double> _performDFT(
+  /// Returns magnitudes for bins 0..n/2-1.
+  /// [samples] length must be a power of two, otherwise [] is returned.
+  List<double> _performFFT(
       List<double> samples,
       ) {
     final int n =
         samples.length;
 
-    if (n == 0) {
+    if (n == 0 ||
+        (n & (n - 1)) != 0) {
       return [];
     }
 
-    final int halfN =
-        n ~/ 2;
+    final List<double> real =
+    List<double>.from(samples);
+
+    final List<double> imag =
+    List<double>.filled(n, 0.0);
+
+    // Bit-reversal permutation.
+    for (
+    int i = 1, j = 0;
+    i < n;
+    i++
+    ) {
+      int bit = n >> 1;
+
+      while ((j & bit) != 0) {
+        j ^= bit;
+        bit >>= 1;
+      }
+
+      j ^= bit;
+
+      if (i < j) {
+        final double tempReal = real[i];
+        real[i] = real[j];
+        real[j] = tempReal;
+
+        final double tempImag = imag[i];
+        imag[i] = imag[j];
+        imag[j] = tempImag;
+      }
+    }
+
+    // Butterfly stages.
+    for (
+    int length = 2;
+    length <= n;
+    length <<= 1
+    ) {
+      final double angle =
+          -2 * pi / length;
+
+      final double wReal = cos(angle);
+      final double wImag = sin(angle);
+
+      final int half = length >> 1;
+
+      for (
+      int i = 0;
+      i < n;
+      i += length
+      ) {
+        double curReal = 1.0;
+        double curImag = 0.0;
+
+        for (
+        int k = 0;
+        k < half;
+        k++
+        ) {
+          final int a = i + k;
+          final int b = a + half;
+
+          final double vReal =
+              real[b] * curReal -
+                  imag[b] * curImag;
+          final double vImag =
+              real[b] * curImag +
+                  imag[b] * curReal;
+
+          real[b] = real[a] - vReal;
+          imag[b] = imag[a] - vImag;
+          real[a] += vReal;
+          imag[a] += vImag;
+
+          final double nextReal =
+              curReal * wReal -
+                  curImag * wImag;
+          curImag =
+              curReal * wImag +
+                  curImag * wReal;
+          curReal = nextReal;
+        }
+      }
+    }
+
+    final int halfN = n >> 1;
 
     final List<double> magnitudes =
-    List<double>.filled(
-      halfN,
-      0.0,
-    );
+    List<double>.filled(halfN, 0.0);
 
     for (
     int k = 0;
     k < halfN;
     k++
     ) {
-      double real = 0.0;
-      double imag = 0.0;
-
-      for (
-      int sampleIndex = 0;
-      sampleIndex < n;
-      sampleIndex++
-      ) {
-        final double angle =
-            2 *
-                pi *
-                k *
-                sampleIndex /
-                n;
-
-        real +=
-            samples[sampleIndex] *
-                cos(angle);
-
-        imag -=
-            samples[sampleIndex] *
-                sin(angle);
-      }
-
       magnitudes[k] =
           sqrt(
-            real * real +
-                imag * imag,
+            real[k] * real[k] +
+                imag[k] * imag[k],
           );
     }
 
     return magnitudes;
+  }
+
+  // ---------------------------------------------------------------------------
+  // BAND ENERGY
+  // ---------------------------------------------------------------------------
+
+  /// Sum of squared magnitudes for bins covering [lowHz, highHz].
+  double _bandEnergy(
+      List<double> magnitudes,
+      double lowHz,
+      double highHz,
+      double binWidthHz,
+      ) {
+    if (magnitudes.length < 2 ||
+        highHz <= lowHz) {
+      return 0.0;
+    }
+
+    final int start =
+    max(
+      1,
+      (lowHz / binWidthHz).floor(),
+    );
+
+    final int end =
+    min(
+      magnitudes.length - 1,
+      (highHz / binWidthHz).ceil(),
+    );
+
+    double energy = 0.0;
+
+    for (
+    int k = start;
+    k <= end;
+    k++
+    ) {
+      energy +=
+          magnitudes[k] *
+              magnitudes[k];
+    }
+
+    return energy;
+  }
+
+  // ---------------------------------------------------------------------------
+  // SPECTRAL FLATNESS
+  // ---------------------------------------------------------------------------
+
+  /// Ratio of geometric to arithmetic mean of the magnitudes (0 = tonal,
+  /// 1 = white noise). Scale-invariant.
+  double _spectralFlatness(
+      List<double> magnitudes,
+      ) {
+    if (magnitudes.length < 2) {
+      return 0.0;
+    }
+
+    double logSum = 0.0;
+    double sum = 0.0;
+    int count = 0;
+
+    for (
+    int k = 1;
+    k < magnitudes.length;
+    k++
+    ) {
+      final double magnitude =
+          max(magnitudes[k], 1e-12);
+
+      logSum += log(magnitude);
+      sum += magnitude;
+      count++;
+    }
+
+    final double geometricMean =
+        exp(logSum / count);
+
+    final double arithmeticMean =
+        sum / count;
+
+    if (arithmeticMean <= 0) {
+      return 0.0;
+    }
+
+    return (
+        geometricMean / arithmeticMean
+    ).clamp(
+      0.0,
+      1.0,
+    );
   }
 
   // ---------------------------------------------------------------------------

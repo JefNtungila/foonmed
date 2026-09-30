@@ -58,6 +58,12 @@ class ScanController extends ChangeNotifier {
         _state = ScanState.completed;
         print('Scan completed and data processed: ${_lastScanData.toString()}');
         print('Mathematical Representation: ${_lastScanData!.mathematicalRepresentation.toJson()}');
+        print(
+          'Detection: ${result.detection.verdict.name.toUpperCase()} '
+          '(score: ${result.detection.score.toStringAsFixed(2)}, '
+          'confidence: ${result.detection.confidence.toStringAsFixed(2)}, '
+          'segments: ${result.detection.segments.length})',
+        );
       } else {
         _errorMessage = 'Scan stopped, but no data was returned.';
         _state = ScanState.error;

@@ -1,16 +1,20 @@
 
 import 'dart:convert';
 
+import '../services/crack_detector.dart';
+
 class ScanData {
   final String audioFilePath;
   final ScanMetadata metadata;
   final MathematicalRepresentation mathematicalRepresentation;
+  final DetectionResult detection;
   final List<SpatialTimeLogEntry> spatialTimeLog;
 
   ScanData({
     required this.audioFilePath,
     required this.metadata,
     required this.mathematicalRepresentation,
+    required this.detection,
     required this.spatialTimeLog,
   });
 
@@ -19,6 +23,7 @@ class ScanData {
       'audioFilePath': audioFilePath,
       'metadata': metadata.toJson(),
       'mathematicalRepresentation': mathematicalRepresentation.toJson(),
+      'detection': detection.toJson(),
       'spatialTimeLog': spatialTimeLog.map((e) => e.toJson()).toList(),
     };
   }
@@ -28,6 +33,9 @@ class ScanData {
       audioFilePath: json['audioFilePath'],
       metadata: ScanMetadata.fromJson(json['metadata']),
       mathematicalRepresentation: MathematicalRepresentation.fromJson(json['mathematicalRepresentation']),
+      detection: json['detection'] != null
+          ? DetectionResult.fromJson(json['detection'] as Map<String, dynamic>)
+          : const DetectionResult.empty(),
       spatialTimeLog: (json['spatialTimeLog'] as List)
           .map((e) => SpatialTimeLogEntry.fromJson(e))
           .toList(),
