@@ -1,26 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:foonmed/controllers/scan_controller.dart';
-import 'package:foonmed/ui/scan_screen.dart';
+
+import 'controllers/vibration_grid_scan_controller.dart';
+import 'ui/scan_screen.dart';
 
 void main() {
   runApp(
     ChangeNotifierProvider(
-      create: (context) => ScanController(),
-      child: const AcousticScannerApp(),
+      create: (context) => VibrationGridScanController(),
+      child: const ContactScanApp(),
     ),
   );
 }
 
-class AcousticScannerApp extends StatelessWidget {
-  const AcousticScannerApp({super.key});
+class ContactScanApp extends StatelessWidget {
+  const ContactScanApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Acoustic Hand Scanner',
+      title: 'Contact Vibration Scanner',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        colorSchemeSeed: Colors.teal,
+        useMaterial3: true,
       ),
       home: const ScanScreen(),
     );
