@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:foon_design/foon_design.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/vibration_grid_scan_controller.dart';
@@ -32,8 +33,9 @@ class _ScanScreenState extends State<ScanScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Contact Vibration Scan'),
+      appBar: FoonTopBar(
+        logo: const AssetImage('assets/foonmed_logo_transparent.png'),
+        semanticLabel: 'FoonMed — Contact Vibration Scan',
       ),
       body: Consumer<VibrationGridScanController>(
         builder: (context, controller, child) {
@@ -74,13 +76,13 @@ class _ScanScreenState extends State<ScanScreen> {
       case GridScanState.completed:
         return _ResultsView(controller: c);
       case GridScanState.aborted:
-        return const _MessageView(
+        return const FoonEmptyState(
           icon: Icons.stop_circle_outlined,
           title: 'Scan aborted',
           message: 'Partial data was discarded. Start a new scan when ready.',
         );
       case GridScanState.error:
-        return _MessageView(
+        return FoonEmptyState(
           icon: Icons.error_outline,
           title: 'Scan failed',
           message: c.errorMessage ?? 'Unknown error',
@@ -93,7 +95,7 @@ class _ScanScreenState extends State<ScanScreen> {
       case GridScanState.idle:
         return _PrimaryButton(
           label: 'START SCAN',
-          color: Colors.green,
+          color: FoonColours.success,
           onPressed: () => c.startScan(),
         );
       case GridScanState.awaitingBaseline:
@@ -102,7 +104,7 @@ class _ScanScreenState extends State<ScanScreen> {
           children: [
             _PrimaryButton(
               label: 'CAPTURE BASELINE',
-              color: Colors.blue,
+              color: FoonColours.info,
               onPressed: () => c.captureBaseline(),
             ),
             const SizedBox(height: 8),
@@ -115,7 +117,7 @@ class _ScanScreenState extends State<ScanScreen> {
           children: [
             _PrimaryButton(
               label: 'PHONE PLACED — MEASURE CELL',
-              color: Colors.blue,
+              color: FoonColours.info,
               onPressed: () => c.confirmPlacement(),
             ),
             const SizedBox(height: 8),
@@ -148,13 +150,13 @@ class _ScanScreenState extends State<ScanScreen> {
           children: [
             _PrimaryButton(
               label: _jsonCopied ? 'JSON COPIED' : 'COPY SCAN JSON',
-              color: Colors.blue,
+              color: FoonColours.info,
               onPressed: () => _copyJson(context, c.lastScan!),
             ),
             const SizedBox(height: 8),
             _PrimaryButton(
               label: 'NEW SCAN',
-              color: Colors.green,
+              color: FoonColours.success,
               onPressed: () => c.startScan(),
             ),
           ],
@@ -163,7 +165,7 @@ class _ScanScreenState extends State<ScanScreen> {
       case GridScanState.error:
         return _PrimaryButton(
           label: 'START OVER',
-          color: Colors.green,
+          color: FoonColours.success,
           onPressed: () => c.startScan(),
         );
     }
@@ -310,34 +312,6 @@ class _BusyView extends StatelessWidget {
   }
 }
 
-class _MessageView extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String message;
-
-  const _MessageView({
-    required this.icon,
-    required this.title,
-    required this.message,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 48, color: Colors.grey),
-          const SizedBox(height: 12),
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Text(message, textAlign: TextAlign.center),
-        ],
-      ),
-    );
-  }
-}
-
 class _ResultsView extends StatelessWidget {
   final VibrationGridScanController controller;
 
@@ -431,36 +405,41 @@ class _GridMatrix extends StatelessWidget {
 
     Color color;
     if (isCurrent) {
-      color = Colors.blue.shade400;
+      color = FoonColours.infoContainer;
     } else if (visited && showValues && baseline > 0) {
       final normalized = value / baseline;
-      final intensity = (normalized / 2).clamp(0.15, 1.0);
-      color = Colors.green.withValues(alpha: intensity);
+      // Alpha capped at 0.60 so black value labels keep >= 4.5:1 contrast.
+      final intensity = (normalized / 2).clamp(0.15, 0.60);
+      color = FoonColours.success.withValues(alpha: intensity);
     } else if (visited) {
-      color = Colors.green.shade300;
+      color = FoonColours.success.withValues(alpha: 0.45);
     } else {
-      color = Colors.grey.shade300;
+      color = FoonColours.neutralLight;
     }
 
     Widget child;
     if (isCurrent) {
-      child = const Icon(Icons.place, color: Colors.white, size: 20);
+      child = const Icon(Icons.place, color: FoonColours.onSemantic, size: 20);
     } else if (showValues && visited && baseline > 0) {
       child = Text(
         (value / baseline).toStringAsFixed(2),
         textAlign: TextAlign.center,
         style: const TextStyle(
           fontSize: 11,
-          color: Colors.black,
+          color: FoonColours.onSurface,
           fontWeight: FontWeight.w600,
         ),
       );
     } else if (visited) {
-      child = const Icon(Icons.check, size: 16, color: Colors.black54);
+      child = Icon(
+        Icons.check,
+        size: 16,
+        color: FoonColours.onSurface.withValues(alpha: 0.54),
+      );
     } else {
       child = Text(
         '${row * controller.cols + col + 1}',
-        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+        style: const TextStyle(fontSize: 11, color: FoonColours.neutralText),
       );
     }
 
@@ -469,7 +448,7 @@ class _GridMatrix extends StatelessWidget {
         color: color,
         borderRadius: BorderRadius.circular(6),
         border: isCurrent
-            ? Border.all(color: Colors.blue.shade900, width: 2)
+            ? Border.all(color: FoonColours.infoStrong, width: 2)
             : null,
       ),
       alignment: Alignment.center,
@@ -496,7 +475,7 @@ class _PrimaryButton extends StatelessWidget {
       style: ElevatedButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 15),
         backgroundColor: color,
-        foregroundColor: Colors.white,
+        foregroundColor: FoonColours.onSemantic,
       ),
       child: Text(label, style: const TextStyle(fontSize: 16)),
     );

@@ -248,6 +248,7 @@ class VibrationGridScanController extends ChangeNotifier {
       ],
     );
     _state = GridScanState.completed;
+    debugPrint(_lastScan!.toJsonString());
     notifyListeners();
   }
 

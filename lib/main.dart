@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:foon_design/foon_design.dart';
 import 'package:provider/provider.dart';
 
 import 'controllers/vibration_grid_scan_controller.dart';
@@ -19,11 +20,8 @@ class ContactScanApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Contact Vibration Scanner',
-      theme: ThemeData(
-        colorSchemeSeed: Colors.teal,
-        useMaterial3: true,
-      ),
+      title: 'FoonMed',
+      theme: FoonTheme.light(),
       home: const ScanScreen(),
     );
   }
