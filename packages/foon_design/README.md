@@ -35,7 +35,7 @@ MaterialApp(
 
 | Export | Contents |
 |---|---|
-| `FoonColours` | Core brand tokens + semantic tokens + the M2-style `ColorScheme` |
+| `FoonColours` | Core brand tokens + neutral tokens + the M2-style `ColorScheme` |
 | `FoonTheme` | `FoonTheme.light()` |
 | `FoonTextStyles` | Display/title/heading/body/label/caption roles |
 | `FoonSpacing` `FoonRadii` `FoonElevation` `FoonSizes` | Layout geometry |
@@ -48,5 +48,6 @@ MaterialApp(
 | `FoonBottomNav` | Labelled dark bottom navigation |
 | `FoonEmptyState` | Icon + title + message placeholder |
 
-Rules that must not be broken: no raw hex in screens, no `colorSchemeSeed`,
-Font Awesome icons only through `FaIcon`, no fixed-width spacers inside rows.
+Rules that must not be broken: no raw hex in screens, no `colorSchemeSeed`, no green/blue
+control fills (state is never hue-coded), Font Awesome icons only through `FaIcon`,
+no fixed-width spacers inside rows.

@@ -25,9 +25,7 @@ void main() {
       expect(FoonColours.primary, const Color(0xFF393A3E));
       expect(FoonColours.secondary, const Color(0xFFF69520));
       expect(FoonColours.background, const Color(0xFF636363));
-      expect(FoonColours.surface, const Color(0xFF808080));
-      expect(FoonColours.success, const Color(0xFF2E7D32));
-      expect(FoonColours.info, const Color(0xFF1565C0));
+      expect(FoonColours.surface, const Color(0xFFFFFFFF));
       expect(FoonColours.neutralLight, const Color(0xFFE0E0E0));
       expect(FoonColours.neutralText, const Color(0xFF757575));
     });
@@ -38,6 +36,9 @@ void main() {
       expect(scheme.primary, FoonColours.primary);
       expect(scheme.secondary, FoonColours.secondary);
       expect(scheme.onSurface, FoonColours.onSurface);
+      expect(scheme.surface, const Color(0xFFFFFFFF));
+      expect(scheme.outline, FoonColours.primary);
+      expect(scheme.outlineVariant, FoonColours.neutralLight);
     });
   });
 

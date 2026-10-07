@@ -14,11 +14,13 @@ class FoonColours {
   /// Foon orange: CTAs, selected navigation, progress, accent text.
   static const Color secondary = Color(0xFFF69520);
 
-  /// Page background.
+  /// Legacy M2 page-background token - retained for cross-app parity.
+  /// Never rendered under M3; the page colour comes from [surface].
   static const Color background = Color(0xFF636363);
 
-  /// Card/sheet surface.
-  static const Color surface = Color(0xFF808080);
+  /// Rendered page background (light mode): scaffold, app bar, canvas,
+  /// dialogs and sheets all resolve from this token.
+  static const Color surface = Color(0xFFFFFFFF);
 
   /// Content on [background].
   static const Color onBackground = secondary;
@@ -38,32 +40,14 @@ class FoonColours {
   /// Content on [primary] (kept from the original FoonCash scheme).
   static const Color onPrimary = Colors.redAccent;
 
-  // Semantic tokens -------------------------------------------------------
-  /// Positive state fills - pair with [onSemantic] text (5.6:1).
-  static const Color success = Color(0xFF2E7D32);
-
-  /// Light positive surface - pair with dark text.
-  static const Color successContainer = Color(0xFFA5D6A7);
-
-  /// Caution fills - pair with dark text.
-  static const Color warning = Color(0xFFF9A825);
-
-  /// Neutral action buttons - pair with [onSemantic] text (5.9:1).
-  static const Color info = Color(0xFF1565C0);
-
-  /// Highlighted/active cell or chip.
-  static const Color infoContainer = Color(0xFF42A5F5);
-
-  /// High-emphasis info borders.
-  static const Color infoStrong = Color(0xFF0D47A1);
-
+  // Neutral tokens --------------------------------------------------------
   /// Empty cells, dividers, disabled fills.
   static const Color neutralLight = Color(0xFFE0E0E0);
 
   /// Muted icons and secondary text.
   static const Color neutralText = Color(0xFF757575);
 
-  /// Text/icons on [success], [info] or [primary] fills.
+  /// Text/icons on [primary] fills.
   static const Color onSemantic = Colors.white;
 
   /// The M2-style scheme used by every Foon app.
@@ -85,6 +69,10 @@ class FoonColours {
     onPrimary: onPrimary,
     onSecondary: onSecondary,
     onSurface: onSurface,
+    // Hairlines, dividers and outlined borders: the implicit fallback for
+    // `outlineVariant` is `onBackground` (orange), which is wrong on white.
+    outline: primary,
+    outlineVariant: neutralLight,
     brightness: Brightness.light,
   );
 }

@@ -40,14 +40,14 @@ class _ScanScreenState extends State<ScanScreen> {
       body: Consumer<VibrationGridScanController>(
         builder: (context, controller, child) {
           return Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(FoonSpacing.m),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _StatusHeader(controller: controller),
-                const SizedBox(height: 12),
+                const SizedBox(height: FoonSpacing.tight),
                 Expanded(child: _buildBody(context, controller)),
-                const SizedBox(height: 12),
+                const SizedBox(height: FoonSpacing.tight),
                 _buildActions(context, controller),
               ],
             ),
@@ -93,21 +93,19 @@ class _ScanScreenState extends State<ScanScreen> {
   Widget _buildActions(BuildContext context, VibrationGridScanController c) {
     switch (c.state) {
       case GridScanState.idle:
-        return _PrimaryButton(
+        return FoonCtaButton(
           label: 'START SCAN',
-          color: FoonColours.success,
           onPressed: () => c.startScan(),
         );
       case GridScanState.awaitingBaseline:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _PrimaryButton(
+            FoonCtaButton(
               label: 'CAPTURE BASELINE',
-              color: FoonColours.info,
               onPressed: () => c.captureBaseline(),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: FoonSpacing.s),
             _TextButton(label: 'Cancel', onPressed: () => c.abortScan()),
           ],
         );
@@ -115,12 +113,11 @@ class _ScanScreenState extends State<ScanScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _PrimaryButton(
-              label: 'PHONE PLACED — MEASURE CELL',
-              color: FoonColours.info,
+            FoonCtaButton(
+              label: 'MEASURE CELL',
               onPressed: () => c.confirmPlacement(),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: FoonSpacing.s),
             Row(
               children: [
                 Expanded(
@@ -148,24 +145,18 @@ class _ScanScreenState extends State<ScanScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _PrimaryButton(
+            FoonCtaButton(
               label: _jsonCopied ? 'JSON COPIED' : 'COPY SCAN JSON',
-              color: FoonColours.info,
               onPressed: () => _copyJson(context, c.lastScan!),
             ),
-            const SizedBox(height: 8),
-            _PrimaryButton(
-              label: 'NEW SCAN',
-              color: FoonColours.success,
-              onPressed: () => c.startScan(),
-            ),
+            const SizedBox(height: FoonSpacing.s),
+            FoonCtaButton(label: 'NEW SCAN', onPressed: () => c.startScan()),
           ],
         );
       case GridScanState.aborted:
       case GridScanState.error:
-        return _PrimaryButton(
+        return FoonCtaButton(
           label: 'START OVER',
-          color: FoonColours.success,
           onPressed: () => c.startScan(),
         );
     }
@@ -212,7 +203,7 @@ class _StatusHeader extends StatelessWidget {
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: FoonSpacing.s),
         LinearProgressIndicator(
           value: state == GridScanState.completed ? 1.0 : controller.progress,
           minHeight: 6,
@@ -278,7 +269,7 @@ class _PlacementView extends StatelessWidget {
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: FoonSpacing.tight),
         Expanded(
           child: Center(
             child: AspectRatio(
@@ -304,7 +295,7 @@ class _BusyView extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const CircularProgressIndicator(),
-          const SizedBox(height: 16),
+          const SizedBox(height: FoonSpacing.m),
           Text(label),
         ],
       ),
@@ -329,7 +320,7 @@ class _ResultsView extends StatelessWidget {
             aspectRatio: 1,
             child: _GridMatrix(controller: controller, showValues: true),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: FoonSpacing.tight),
           Text(
             'Baseline (air): ${scan.baselineAirRms.toStringAsFixed(3)} m/s² RMS',
             textAlign: TextAlign.center,
@@ -340,7 +331,7 @@ class _ResultsView extends StatelessWidget {
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: FoonSpacing.s),
           ExpansionTile(
             title: const Text('Normalized feature vector'),
             children: [
@@ -378,8 +369,8 @@ class _GridMatrix extends StatelessWidget {
       crossAxisCount: cols,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 4,
-      crossAxisSpacing: 4,
+      mainAxisSpacing: FoonSpacing.xs,
+      crossAxisSpacing: FoonSpacing.xs,
       children: [
         for (var r = 0; r < rows; r++)
           for (var c = 0; c < cols; c++)
@@ -403,23 +394,28 @@ class _GridMatrix extends StatelessWidget {
         (controller.cellIndex > row * controller.cols + col &&
             controller.state != GridScanState.idle);
 
+    // Grey empty cell ramping to Foon orange; opaque so the measured cells
+    // never read lighter than the empty ones on the white page.
+    Color cellColour(double t) =>
+        Color.lerp(FoonColours.neutralLight, FoonColours.secondary, t)!;
+
     Color color;
     if (isCurrent) {
-      color = FoonColours.infoContainer;
+      color = FoonColours.secondary;
     } else if (visited && showValues && baseline > 0) {
       final normalized = value / baseline;
-      // Alpha capped at 0.60 so black value labels keep >= 4.5:1 contrast.
+      // Ramp capped at 0.60 so dark value labels keep >= 9:1 contrast.
       final intensity = (normalized / 2).clamp(0.15, 0.60);
-      color = FoonColours.success.withValues(alpha: intensity);
+      color = cellColour(intensity);
     } else if (visited) {
-      color = FoonColours.success.withValues(alpha: 0.45);
+      color = cellColour(0.45);
     } else {
       color = FoonColours.neutralLight;
     }
 
     Widget child;
     if (isCurrent) {
-      child = const Icon(Icons.place, color: FoonColours.onSemantic, size: 20);
+      child = const Icon(Icons.place, color: FoonColours.primary, size: 20);
     } else if (showValues && visited && baseline > 0) {
       child = Text(
         (value / baseline).toStringAsFixed(2),
@@ -439,45 +435,20 @@ class _GridMatrix extends StatelessWidget {
     } else {
       child = Text(
         '${row * controller.cols + col + 1}',
-        style: const TextStyle(fontSize: 11, color: FoonColours.neutralText),
+        style: const TextStyle(fontSize: 11, color: FoonColours.primary),
       );
     }
 
     return Container(
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(FoonRadii.cell),
         border: isCurrent
-            ? Border.all(color: FoonColours.infoStrong, width: 2)
+            ? Border.all(color: FoonColours.primary, width: 2)
             : null,
       ),
       alignment: Alignment.center,
       child: child,
-    );
-  }
-}
-
-class _PrimaryButton extends StatelessWidget {
-  final String label;
-  final Color color;
-  final VoidCallback onPressed;
-
-  const _PrimaryButton({
-    required this.label,
-    required this.color,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 15),
-        backgroundColor: color,
-        foregroundColor: FoonColours.onSemantic,
-      ),
-      child: Text(label, style: const TextStyle(fontSize: 16)),
     );
   }
 }
@@ -492,6 +463,10 @@ class _TextButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextButton(
       onPressed: onPressed,
+      style: TextButton.styleFrom(
+        foregroundColor: FoonColours.onSurface,
+        textStyle: FoonTextStyles.body,
+      ),
       child: Text(label),
     );
   }

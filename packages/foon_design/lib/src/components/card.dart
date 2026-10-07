@@ -55,9 +55,16 @@ class FoonCard extends StatelessWidget {
           child: Container(
             height: height,
             width: double.infinity,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.all(Radius.circular(FoonRadii.card)),
+              // White card on the white page needs an edge to stay visible.
+              border: Border.all(
+                color: FoonColours.neutralLight,
+                width: 1,
+              ),
+              borderRadius: const BorderRadius.all(
+                Radius.circular(FoonRadii.card),
+              ),
             ),
             alignment: Alignment.bottomCenter,
             child: Column(
